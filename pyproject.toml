@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ai-automation-alert"
+version = "0.1.0"
+description = "Automation exposure scoring and notification system using O*NET occupational data"
+requires-python = ">=3.10"
+dependencies = [
+    "httpx>=0.27",
+    "pydantic>=2.5",
+    "anthropic>=0.40",
+    "rich>=13.0",
+    "jinja2>=3.1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "ruff>=0.4"]
+
+[project.scripts]
+automation-alert = "automation_alert.cli:main"
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
