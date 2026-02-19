@@ -18,7 +18,6 @@ This is layered ON TOP of the base E0-E11 scoring, not a replacement.
 from __future__ import annotations
 
 import enum
-from typing import Optional
 
 from pydantic import BaseModel, Field
 

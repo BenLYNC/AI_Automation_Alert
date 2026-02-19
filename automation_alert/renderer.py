@@ -13,12 +13,9 @@ Supports both rich terminal output and plain-text/markdown.
 from __future__ import annotations
 
 import json
-from typing import TextIO
 
 from .agentic_layer import (
-    AGENTIC_CEILING_CAPS,
     AgenticImpactScore,
-    MATURITY_LABELS,
     OPERATING_MODE_LABELS,
     WORKFLOW_UNIT_LABELS,
 )
@@ -27,8 +24,6 @@ from .models import (
     CategorySummary,
     EXPOSURE_LABELS,
     ExposureLevel,
-    OnetCategory,
-    ScoredItem,
 )
 
 
