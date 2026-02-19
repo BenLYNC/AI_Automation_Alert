@@ -21,6 +21,10 @@ import logging
 import os
 import sys
 
+from dotenv import load_dotenv
+
+load_dotenv()  # automatically loads .env file (GEMINI_API_KEY, ONET creds, etc.)
+
 from .llm_client import AVAILABLE_MODELS, DEFAULT_MODELS
 from .models import OnetCategory, SCORABLE_CATEGORIES
 from .onet_client import OnetClient, OnetApiError
