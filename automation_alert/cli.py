@@ -188,6 +188,15 @@ def _cmd_score(args: argparse.Namespace) -> None:
         )
         sys.exit(1)
 
+    if not os.environ.get("ONET_API_KEY"):
+        print(
+            "Error: ONET_API_KEY not set.\n"
+            "Get a free key at: https://services.onetcenter.org/\n"
+            "Then add to .env: ONET_API_KEY=your_key",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     # Initialize clients
     onet = OnetClient()
     scorer = Scorer(provider=provider, model=args.model)

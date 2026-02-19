@@ -1,7 +1,7 @@
-"""O*NET Web Services API client.
+"""O*NET Web Services API v2 client.
 
 Fetches all scorable attribute categories for a given SOC code.
-Requires an O*NET API username/password (free at https://services.onetcenter.org/).
+Requires an O*NET API key (free at https://services.onetcenter.org/).
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ import httpx
 from .models import OnetCategory, SCORABLE_CATEGORIES
 
 
-ONET_BASE_URL = "https://services.onetcenter.org/ws"
+ONET_BASE_URL = "https://api-v2.onetcenter.org"
 
 # Mapping from our category enum to O*NET API endpoint paths
 _CATEGORY_ENDPOINTS: dict[OnetCategory, str] = {
@@ -39,30 +39,29 @@ class OnetApiError(Exception):
 
 
 class OnetClient:
-    """Async client for the O*NET Web Services REST API."""
+    """Client for the O*NET Web Services v2 REST API."""
 
     def __init__(
         self,
-        username: str | None = None,
-        password: str | None = None,
+        api_key: str | None = None,
         base_url: str = ONET_BASE_URL,
     ):
-        self.username = username or os.environ.get("ONET_USERNAME", "")
-        self.password = password or os.environ.get("ONET_PASSWORD", "")
+        self.api_key = api_key or os.environ.get("ONET_API_KEY", "")
         self.base_url = base_url.rstrip("/")
 
-    def _auth(self) -> tuple[str, str]:
-        return (self.username, self.password)
+    def _headers(self) -> dict[str, str]:
+        return {
+            "Accept": "application/json",
+            "X-API-Key": self.api_key,
+        }
 
     async def _get(self, path: str) -> dict[str, Any]:
         """Make an authenticated GET request to the O*NET API."""
         url = f"{self.base_url}/{path}"
-        headers = {"Accept": "application/json"}
         async with httpx.AsyncClient() as client:
             resp = await client.get(
                 url,
-                auth=self._auth(),
-                headers=headers,
+                headers=self._headers(),
                 timeout=30.0,
             )
             if resp.status_code != 200:
@@ -119,9 +118,8 @@ class OnetClient:
         if not endpoint:
             return []
         url = f"{self.base_url}/online/occupations/{soc_code}/{endpoint}"
-        headers = {"Accept": "application/json"}
         resp = httpx.get(
-            url, auth=self._auth(), headers=headers, timeout=30.0
+            url, headers=self._headers(), timeout=30.0
         )
         if resp.status_code != 200:
             raise OnetApiError(
