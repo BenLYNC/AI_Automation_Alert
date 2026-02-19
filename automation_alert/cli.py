@@ -1,22 +1,30 @@
 """CLI entry point for the Automation Alert system.
 
 Usage:
+    # Free tier (Gemini) — default:
     automation-alert score 41-9022.00 --title "Real Estate Sales Agents"
-    automation-alert score 15-1252.00 --title "Software Developers" --format json
-    automation-alert score 29-1141.00 --no-agentic --output report.md
+
+    # Anthropic (paid):
+    automation-alert score 41-9022.00 --provider anthropic --title "Real Estate Sales Agents"
+
+    # Specific model:
+    automation-alert score 15-1252.00 --provider gemini --model gemini-1.5-pro --format json
+
+    # Demo (no API keys needed):
+    automation-alert demo
 """
 
 from __future__ import annotations
 
 import argparse
-import json
 import logging
 import os
 import sys
 
+from .llm_client import AVAILABLE_MODELS, DEFAULT_MODELS
 from .models import OnetCategory, SCORABLE_CATEGORIES
 from .onet_client import OnetClient, OnetApiError
-from .renderer import render_json, render_markdown, write_report
+from .renderer import render_json, render_markdown
 from .scorer import Scorer
 
 
@@ -41,6 +49,17 @@ def main(argv: list[str] | None = None) -> None:
         default=None,
     )
     score_parser.add_argument(
+        "--provider", "-p",
+        choices=["gemini", "anthropic"],
+        default="gemini",
+        help="LLM provider (default: gemini — free tier)",
+    )
+    score_parser.add_argument(
+        "--model", "-m",
+        default=None,
+        help="Model name (uses provider default if not specified)",
+    )
+    score_parser.add_argument(
         "--format",
         choices=["markdown", "json"],
         default="markdown",
@@ -57,11 +76,6 @@ def main(argv: list[str] | None = None) -> None:
         help="Skip the agentic impact layer",
     )
     score_parser.add_argument(
-        "--model",
-        default="claude-sonnet-4-5-20250929",
-        help="Anthropic model to use for scoring",
-    )
-    score_parser.add_argument(
         "--categories",
         nargs="+",
         help="Specific categories to score (default: all scorable)",
@@ -74,8 +88,13 @@ def main(argv: list[str] | None = None) -> None:
     )
 
     # -- list-categories command --
-    list_parser = subparsers.add_parser(
+    subparsers.add_parser(
         "list-categories", help="List all scorable O*NET categories"
+    )
+
+    # -- list-models command --
+    subparsers.add_parser(
+        "list-models", help="List available LLM providers and models"
     )
 
     # -- demo command --
@@ -93,6 +112,8 @@ def main(argv: list[str] | None = None) -> None:
 
     if args.command == "list-categories":
         _cmd_list_categories()
+    elif args.command == "list-models":
+        _cmd_list_models()
     elif args.command == "demo":
         _cmd_demo(args)
     elif args.command == "score":
@@ -105,6 +126,20 @@ def _cmd_list_categories() -> None:
     print("Scorable O*NET categories:")
     for cat in SCORABLE_CATEGORIES:
         print(f"  - {cat.value}")
+
+
+def _cmd_list_models() -> None:
+    print("Available LLM providers and models:\n")
+    for provider, models in AVAILABLE_MODELS.items():
+        default = DEFAULT_MODELS[provider]
+        env_var = "GEMINI_API_KEY" if provider == "gemini" else "ANTHROPIC_API_KEY"
+        cost = "FREE tier available" if provider == "gemini" else "Paid (starts at $3/M input tokens)"
+        print(f"  {provider} ({cost})")
+        print(f"    API key env var: {env_var}")
+        for m in models:
+            marker = " (default)" if m == default else ""
+            print(f"    - {m}{marker}")
+        print()
 
 
 def _cmd_demo(args: argparse.Namespace) -> None:
@@ -130,20 +165,37 @@ def _cmd_score(args: argparse.Namespace) -> None:
     if args.verbose:
         logging.basicConfig(level=logging.INFO)
 
-    # Validate API keys
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        print("Error: ANTHROPIC_API_KEY environment variable not set.", file=sys.stderr)
+    # Validate API key for chosen provider
+    provider = args.provider
+    if provider == "gemini" and not os.environ.get("GEMINI_API_KEY"):
+        print(
+            "Error: GEMINI_API_KEY not set.\n"
+            "Get a free key at: https://aistudio.google.com/apikey\n"
+            "Then: export GEMINI_API_KEY=your_key",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    elif provider == "anthropic" and not os.environ.get("ANTHROPIC_API_KEY"):
+        print(
+            "Error: ANTHROPIC_API_KEY not set.\n"
+            "Get a key at: https://console.anthropic.com/\n"
+            "Then: export ANTHROPIC_API_KEY=sk-ant-...",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     # Initialize clients
     onet = OnetClient()
-    scorer = Scorer(model=args.model)
+    scorer = Scorer(provider=provider, model=args.model)
+
+    model_name = args.model or DEFAULT_MODELS.get(provider, "default")
+    print(f"Using {provider}/{model_name}", file=sys.stderr)
 
     # Fetch occupation title if not provided
     title = args.title
     if not title:
         try:
-            summary = onet.get_category_sync(args.soc_code, OnetCategory.TASKS)
+            onet.get_category_sync(args.soc_code, OnetCategory.TASKS)
             title = args.soc_code  # Fallback
         except OnetApiError:
             title = args.soc_code

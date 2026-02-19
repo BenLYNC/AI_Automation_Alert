@@ -6,16 +6,14 @@ the scoring engine → produces the AutomationAlert output.
 Two-layer scoring:
 1. Base layer: E0-E11 exposure taxonomy with subtask decomposition
 2. Agentic layer: Operating modes, W1-W7 workflow units, EA/OT, maturity model
+
+Provider-agnostic: works with Anthropic (Claude) or Google (Gemini).
 """
 
 from __future__ import annotations
 
-import json
 import logging
-import os
 from typing import Any
-
-import anthropic
 
 from .agentic_layer import (
     AgenticCeilingCategory,
@@ -30,6 +28,7 @@ from .agentic_layer import (
     apply_agentic_adjustment,
     score_agentic_item,
 )
+from .llm_client import LLMClient, create_client
 from .models import (
     CeilingCategory,
     ExposureLevel,
@@ -53,42 +52,31 @@ logger = logging.getLogger(__name__)
 
 
 class Scorer:
-    """Orchestrates LLM-based scoring for an entire occupation."""
+    """Orchestrates LLM-based scoring for an entire occupation.
+
+    Works with any LLM provider via the LLMClient interface.
+    Default provider is Gemini (free tier).
+    """
 
     def __init__(
         self,
+        provider: str = "gemini",
+        model: str | None = None,
         api_key: str | None = None,
-        model: str = "claude-sonnet-4-5-20250929",
+        llm_client: LLMClient | None = None,
     ):
-        self.client = anthropic.Anthropic(
-            api_key=api_key or os.environ.get("ANTHROPIC_API_KEY", ""),
-        )
-        self.model = model
+        """Initialize the scorer.
 
-    def _call_llm(self, system: str, user_prompt: str) -> str:
-        """Make a single LLM call and return the text response."""
-        response = self.client.messages.create(
-            model=self.model,
-            max_tokens=8192,
-            system=system,
-            messages=[{"role": "user", "content": user_prompt}],
-        )
-        return response.content[0].text
-
-    def _parse_json_response(self, text: str) -> list[dict[str, Any]]:
-        """Extract a JSON array from the LLM response."""
-        text = text.strip()
-        if text.startswith("```"):
-            lines = text.split("\n")
-            lines = [l for l in lines if not l.strip().startswith("```")]
-            text = "\n".join(lines)
-
-        start = text.find("[")
-        end = text.rfind("]") + 1
-        if start == -1 or end == 0:
-            raise ValueError(f"No JSON array found in LLM response: {text[:200]}")
-
-        return json.loads(text[start:end])
+        Args:
+            provider: "gemini" or "anthropic" (ignored if llm_client provided)
+            model: Model name (uses provider default if not specified)
+            api_key: API key (falls back to environment variables)
+            llm_client: Pre-built LLM client (overrides provider/model/api_key)
+        """
+        if llm_client:
+            self.llm = llm_client
+        else:
+            self.llm = create_client(provider=provider, model=model, api_key=api_key)
 
     # ------------------------------------------------------------------
     # Base E0-E11 Scoring
@@ -130,8 +118,8 @@ class Scorer:
             "Scoring %d %s items for %s", len(items_for_prompt), category.value, soc_code
         )
 
-        response_text = self._call_llm(SYSTEM_PROMPT, prompt)
-        scored_data = self._parse_json_response(response_text)
+        response_text = self.llm.call(SYSTEM_PROMPT, prompt)
+        scored_data = self.llm.parse_json_array(response_text)
 
         scored_items: list[ScoredItem] = []
         for sd in scored_data:
@@ -213,8 +201,8 @@ class Scorer:
             len(items_for_prompt), category.value, soc_code,
         )
 
-        response_text = self._call_llm(AGENTIC_SYSTEM_PROMPT, prompt)
-        agentic_data = self._parse_json_response(response_text)
+        response_text = self.llm.call(AGENTIC_SYSTEM_PROMPT, prompt)
+        agentic_data = self.llm.parse_json_array(response_text)
 
         results: list[AgenticImpactScore] = []
         for ad in agentic_data:
@@ -233,7 +221,6 @@ class Scorer:
         The LLM provides qualitative assessments (Steps A-D);
         score_agentic_item() applies the deterministic pipeline (Steps E-H).
         """
-        # Parse workflow unit scores
         workflow_scores = []
         for ws in data["workflow_scores"]:
             workflow_scores.append(WorkflowUnitScore(
