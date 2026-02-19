@@ -25,7 +25,6 @@ from .models import (
     OnetCategory,
     ScoreDelta,
     ScoredItem,
-    SubtaskBucket,
     SubtaskScore,
 )
 
