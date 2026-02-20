@@ -14,7 +14,7 @@ import httpx
 from .models import OnetCategory, SCORABLE_CATEGORIES
 
 
-ONET_BASE_URL = "https://api-v2.onetcenter.org"
+ONET_BASE_URL = "https://services.onetcenter.org/ws"
 
 # Mapping from our category enum to O*NET API endpoint paths
 _CATEGORY_ENDPOINTS: dict[OnetCategory, str] = {
@@ -49,10 +49,13 @@ class OnetClient:
         self.api_key = api_key or os.environ.get("ONET_API_KEY", "")
         self.base_url = base_url.rstrip("/")
 
+    def _auth(self) -> httpx.BasicAuth:
+        """O*NET Web Services uses HTTP Basic Auth (username=API key)."""
+        return httpx.BasicAuth(username=self.api_key, password="")
+
     def _headers(self) -> dict[str, str]:
         return {
             "Accept": "application/json",
-            "X-API-Key": self.api_key,
         }
 
     async def _get(self, path: str) -> dict[str, Any]:
@@ -62,6 +65,7 @@ class OnetClient:
             resp = await client.get(
                 url,
                 headers=self._headers(),
+                auth=self._auth(),
                 timeout=30.0,
             )
             if resp.status_code != 200:
@@ -119,7 +123,7 @@ class OnetClient:
             return []
         url = f"{self.base_url}/online/occupations/{soc_code}/{endpoint}"
         resp = httpx.get(
-            url, headers=self._headers(), timeout=30.0
+            url, headers=self._headers(), auth=self._auth(), timeout=30.0
         )
         if resp.status_code != 200:
             raise OnetApiError(
