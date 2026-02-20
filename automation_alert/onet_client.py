@@ -17,21 +17,22 @@ from .models import OnetCategory, SCORABLE_CATEGORIES
 
 ONET_BASE_URL = "https://api-v2.onetcenter.org"
 
-# Mapping from our category enum to O*NET API endpoint paths
+# Mapping from our category enum to O*NET v2 API endpoint paths.
+# The v2 API uses "details/" for scored elements and "summary/" for others.
 _CATEGORY_ENDPOINTS: dict[OnetCategory, str] = {
-    OnetCategory.TASKS: "tasks",
-    OnetCategory.SKILLS: "skills",
-    OnetCategory.KNOWLEDGE: "knowledge",
-    OnetCategory.ABILITIES: "abilities",
-    OnetCategory.WORK_ACTIVITIES: "work_activities",
-    OnetCategory.DETAILED_WORK_ACTIVITIES: "detailed_work_activities",
-    OnetCategory.TECHNOLOGY_SKILLS: "technology_skills",
-    OnetCategory.WORK_CONTEXT: "work_context",
-    OnetCategory.WORK_STYLES: "work_styles",
-    OnetCategory.WORK_VALUES: "work_values",
-    OnetCategory.INTERESTS: "interests",
-    OnetCategory.JOB_ZONES: "job_zone",
-    OnetCategory.EDUCATION: "education",
+    OnetCategory.TASKS: "details/tasks",
+    OnetCategory.SKILLS: "details/skills",
+    OnetCategory.KNOWLEDGE: "details/knowledge",
+    OnetCategory.ABILITIES: "details/abilities",
+    OnetCategory.WORK_ACTIVITIES: "details/work_activities",
+    OnetCategory.DETAILED_WORK_ACTIVITIES: "details/detailed_work_activities",
+    OnetCategory.TECHNOLOGY_SKILLS: "summary/technology_skills",
+    OnetCategory.WORK_CONTEXT: "summary/work_context",
+    OnetCategory.WORK_STYLES: "details/work_styles",
+    OnetCategory.WORK_VALUES: "summary/work_values",
+    OnetCategory.INTERESTS: "summary/interests",
+    OnetCategory.JOB_ZONES: "summary/job_zone",
+    OnetCategory.EDUCATION: "summary/education",
 }
 
 
@@ -83,7 +84,7 @@ class OnetClient:
         endpoint = _CATEGORY_ENDPOINTS.get(category)
         if not endpoint:
             return []
-        data = await self._get(f"online/occupations/{soc_code}/{endpoint}")
+        data = await self._get(f"online/occupations/{soc_code}/{endpoint}?display=long")
         # O*NET API wraps results in varying keys; normalize.
         for key in ("task", "skill", "knowledge", "ability",
                      "work_activity", "detailed_work_activity",
@@ -119,7 +120,7 @@ class OnetClient:
         endpoint = _CATEGORY_ENDPOINTS.get(category)
         if not endpoint:
             return []
-        url = f"{self.base_url}/online/occupations/{soc_code}/{endpoint}"
+        url = f"{self.base_url}/online/occupations/{soc_code}/{endpoint}?display=long"
         resp = httpx.get(
             url, headers=self._headers(), timeout=30.0
         )
