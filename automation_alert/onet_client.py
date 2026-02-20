@@ -1,8 +1,8 @@
 """O*NET Web Services API client.
 
 Fetches all scorable attribute categories for a given SOC code.
-Requires O*NET Web Services credentials (free at https://services.onetcenter.org/).
-Set ONET_USERNAME and ONET_PASSWORD in your .env file.
+Requires an O*NET Web Services API key (free at https://services.onetcenter.org/).
+Set ONET_API_KEY in your .env file.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ import httpx
 from .models import OnetCategory, SCORABLE_CATEGORIES
 
 
-ONET_BASE_URL = "https://services.onetcenter.org/ws"
+ONET_BASE_URL = "https://api-v2.onetcenter.org"
 
 # Mapping from our category enum to O*NET API endpoint paths
 _CATEGORY_ENDPOINTS: dict[OnetCategory, str] = {
@@ -44,21 +44,17 @@ class OnetClient:
 
     def __init__(
         self,
-        username: str | None = None,
-        password: str | None = None,
+        api_key: str | None = None,
         base_url: str = ONET_BASE_URL,
     ):
-        self.username = username or os.environ.get("ONET_USERNAME", "")
-        self.password = password or os.environ.get("ONET_PASSWORD", "")
+        self.api_key = api_key or os.environ.get("ONET_API_KEY", "")
         self.base_url = base_url.rstrip("/")
-
-    def _auth(self) -> httpx.BasicAuth:
-        """O*NET Web Services uses HTTP Basic Auth."""
-        return httpx.BasicAuth(username=self.username, password=self.password)
 
     def _headers(self) -> dict[str, str]:
         return {
             "Accept": "application/json",
+            "User-Agent": "python-OnetWebService/2.00 (bot)",
+            "X-API-Key": self.api_key,
         }
 
     async def _get(self, path: str) -> dict[str, Any]:
@@ -68,7 +64,6 @@ class OnetClient:
             resp = await client.get(
                 url,
                 headers=self._headers(),
-                auth=self._auth(),
                 timeout=30.0,
             )
             if resp.status_code != 200:
@@ -126,7 +121,7 @@ class OnetClient:
             return []
         url = f"{self.base_url}/online/occupations/{soc_code}/{endpoint}"
         resp = httpx.get(
-            url, headers=self._headers(), auth=self._auth(), timeout=30.0
+            url, headers=self._headers(), timeout=30.0
         )
         if resp.status_code != 200:
             raise OnetApiError(
