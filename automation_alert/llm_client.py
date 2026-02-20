@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import time
 from abc import ABC, abstractmethod
 from typing import Any
 
@@ -89,18 +90,29 @@ class GeminiClient(LLMClient):
 
     def call(self, system: str, user_prompt: str) -> str:
         from google.genai import types
+        from google.genai.errors import ClientError
 
-        response = self.client.models.generate_content(
-            model=self.model,
-            contents=user_prompt,
-            config=types.GenerateContentConfig(
-                system_instruction=system,
-                max_output_tokens=8192,
-                temperature=0.2,
-                response_mime_type="application/json",
-            ),
-        )
-        return response.text
+        max_retries = 5
+        for attempt in range(max_retries):
+            try:
+                response = self.client.models.generate_content(
+                    model=self.model,
+                    contents=user_prompt,
+                    config=types.GenerateContentConfig(
+                        system_instruction=system,
+                        max_output_tokens=8192,
+                        temperature=0.2,
+                        response_mime_type="application/json",
+                    ),
+                )
+                return response.text
+            except ClientError as e:
+                if e.code == 429 and attempt < max_retries - 1:
+                    wait = min(2 ** attempt * 15, 120)  # 15s, 30s, 60s, 120s
+                    logger.warning(f"Rate limited (429). Waiting {wait}s before retry {attempt + 1}/{max_retries - 1}...")
+                    time.sleep(wait)
+                else:
+                    raise
 
 
 # ---------------------------------------------------------------------------
