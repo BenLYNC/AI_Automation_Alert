@@ -188,11 +188,13 @@ def _cmd_score(args: argparse.Namespace) -> None:
         )
         sys.exit(1)
 
-    if not os.environ.get("ONET_API_KEY"):
+    if not os.environ.get("ONET_USERNAME") or not os.environ.get("ONET_PASSWORD"):
         print(
-            "Error: ONET_API_KEY not set.\n"
-            "Get a free key at: https://services.onetcenter.org/\n"
-            "Then add to .env: ONET_API_KEY=your_key",
+            "Error: O*NET credentials not set.\n"
+            "Register (free) at: https://services.onetcenter.org/\n"
+            "Then add to .env:\n"
+            "  ONET_USERNAME=your_username\n"
+            "  ONET_PASSWORD=your_password",
             file=sys.stderr,
         )
         sys.exit(1)

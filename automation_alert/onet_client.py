@@ -1,7 +1,8 @@
-"""O*NET Web Services API v2 client.
+"""O*NET Web Services API client.
 
 Fetches all scorable attribute categories for a given SOC code.
-Requires an O*NET API key (free at https://services.onetcenter.org/).
+Requires O*NET Web Services credentials (free at https://services.onetcenter.org/).
+Set ONET_USERNAME and ONET_PASSWORD in your .env file.
 """
 
 from __future__ import annotations
@@ -43,15 +44,17 @@ class OnetClient:
 
     def __init__(
         self,
-        api_key: str | None = None,
+        username: str | None = None,
+        password: str | None = None,
         base_url: str = ONET_BASE_URL,
     ):
-        self.api_key = api_key or os.environ.get("ONET_API_KEY", "")
+        self.username = username or os.environ.get("ONET_USERNAME", "")
+        self.password = password or os.environ.get("ONET_PASSWORD", "")
         self.base_url = base_url.rstrip("/")
 
     def _auth(self) -> httpx.BasicAuth:
-        """O*NET Web Services uses HTTP Basic Auth (username=API key)."""
-        return httpx.BasicAuth(username=self.api_key, password="")
+        """O*NET Web Services uses HTTP Basic Auth."""
+        return httpx.BasicAuth(username=self.username, password=self.password)
 
     def _headers(self) -> dict[str, str]:
         return {
